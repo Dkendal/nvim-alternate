@@ -1,5 +1,5 @@
 rockspec_format = "3.0"
-package = "nvim-plugin"
+package = "nvim-alternate"
 version = "dev-1"
 source = {
    url = "git+ssh://git@github.com/Dkendal/nvim-plugin.git"

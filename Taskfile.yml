@@ -3,7 +3,7 @@
 version: "3"
 
 vars:
-  rockspec: ./nvim-kitty-dev-2.rockspec
+  rockspec: ./nvim-alternate-dev-1.rockspec
 
 env:
   LUAROCKS_PREFIX: "{{.ROOT_DIR}}/lua_modules"
