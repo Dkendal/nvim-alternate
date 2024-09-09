@@ -4,7 +4,6 @@ local group = vim.api.nvim_create_augroup("nvim-alternate", { clear = true })
 ---@param paths string
 ---@return nil
 local function set_alternates(paths)
-  vim.print("Setting alternates to " .. paths)
   vim.b.alternate = paths
 end
 
