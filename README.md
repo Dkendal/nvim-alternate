@@ -93,9 +93,28 @@ require('nvim-alternate').setup({
 ```lua
 require('nvim-alternate').setup({
   pairs = {
-    {'src/**/*.ts', 'tests/**/*.test.ts'},
-    {'src/**/*.js', 'tests/**/*.test.js'},
-    {'src/**/*.tsx', 'src/**/*.test.tsx'},
+    {
+      { "*.ts", "*.tsx", "*.js", "*.jsx" },
+      "(.+).([jt]sx?)",
+      "%1.test.%2",
+    },
+    {
+      { "*.test.ts", "*.test.tsx", "*.js", "*.jsx" },
+      "(.+).test.([jt]sx?)",
+      "%1.%2",
+    },
+  }
+})
+```
+
+### Elixir
+
+```lua
+require('nvim-alternate').setup({
+  pairs = {
+    { "lib/*.ex",        "test/*_test.exs" },
+    { "lib/*/live/*.ex", "lib/*/live/*.html.heex" },
+    { "apps/*/lib/*.ex", "apps/*/test/*_test.exs" },
   }
 })
 ```
