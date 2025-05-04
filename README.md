@@ -41,16 +41,13 @@ use {
 
 ```lua
 require('nvim-alternate').setup({
-  pairs = {
-    -- Simple pairs (source and test)
-    {'lua/*.lua', 'tests/*_spec.lua'},
+  rules = {
+    -- Glob patterns (matching pairs of files)
+    { glob = { "lua/*.lua", "tests/*_spec.lua" } },
     
-    -- Example for specific file types
-    {'src/components/*.tsx', 'src/components/*.test.tsx'},
-    {'src/lib/*.ts', 'tests/lib/*.test.ts'},
-    
-    -- Custom pairing with advanced matching
-    {{'*/models/*.rb'}, '(.+)/models/(.+).rb', '%1/spec/models/%2_spec.rb'},
+    -- Regular patterns with Lua pattern matching
+    { pattern = { "(.+).([jt]sx?)$", "%1.test.%2" } },
+    { pattern = { "(.+).test.([jt]sx?)$", "%1.%2" } },
   }
 })
 ```
@@ -61,7 +58,7 @@ Map a key to access the alternate file:
 
 ```lua
 -- Use the provided <Plug> mapping
-vim.keymap.set('n', '<leader>a', '<Plug>(alternate-edit)', { noremap = false })
+vim.keymap.set('n', '<leader>a', '<plug>(alternate-edit)', { noremap = false })
 
 -- Or map directly to the function
 vim.keymap.set('n', '<leader>a', require('nvim-alternate').plug.edit)
@@ -71,19 +68,50 @@ vim.keymap.set('n', '<leader>a', require('nvim-alternate').plug.edit)
 
 - `:AlternatePrint` - Print the current alternate file path
 
-## Examples
+## Example Configuration
+
+This example shows how to configure the plugin with lazy.nvim:
+
+```lua
+{
+    dir = "dkendal/nvim-alternate",
+    lazy = false,
+    opts = {
+        rules = {
+            -- Haskell
+            { glob = { "src/*.hs", "test/*Spec.hs" } },
+            -- Elixir
+            { glob = { "lib/*.ex", "test/*_test.exs" } },
+            { glob = { "lib/*/live/*.ex", "lib/*/live/*.html.heex" } },
+            { glob = { "apps/*/lib/*.ex", "apps/*/test/*_test.exs" } },
+            -- Ruby
+            { glob = { "app/*.rb", "test/*_test.rb" } },
+            { glob = { "test/*_test.rb", "app/*.rb" } },
+            -- Lua
+            { glob = { "lua/*.lua", "tests/*_spec.lua" } },
+            { pattern = { "(.+).([jt]sx?)$", "%1.test.%2" } },
+            { pattern = { "(.+).test.([jt]sx?)$", "%1.%2" } },
+        },
+    },
+    keys = {
+        { "<leader>pa", "<plug>(alternate-edit)" },
+    },
+},
+```
+
+## Examples by Language
 
 ### Ruby on Rails
 
 ```lua
 require('nvim-alternate').setup({
-  pairs = {
+  rules = {
     -- Models and specs
-    {'app/models/*.rb', 'spec/models/*_spec.rb'},
+    { glob = { "app/models/*.rb", "spec/models/*_spec.rb" } },
     -- Controllers and specs
-    {'app/controllers/*.rb', 'spec/controllers/*_spec.rb'},
+    { glob = { "app/controllers/*.rb", "spec/controllers/*_spec.rb" } },
     -- Views and specs
-    {'app/views/*/*.erb', 'spec/views/*/*_spec.rb'},
+    { glob = { "app/views/*/*.erb", "spec/views/*/*_spec.rb" } },
   }
 })
 ```
@@ -92,18 +120,10 @@ require('nvim-alternate').setup({
 
 ```lua
 require('nvim-alternate').setup({
-  pairs = {
-    {
-      { "*.ts", "*.tsx", "*.js", "*.jsx" },
-      "(.+).([jt]sx?)",
-      "%1.test.%2",
-    },
-    {
-      { "*.test.ts", "*.test.tsx", "*.js", "*.jsx" },
-      "(.+).test.([jt]sx?)",
-      "%1.%2",
-    },
-  }
+  rules = [
+    { pattern = { "(.+).([jt]sx?)$", "%1.test.%2" } },
+    { pattern = { "(.+).test.([jt]sx?)$", "%1.%2" } },
+  ]
 })
 ```
 
@@ -111,10 +131,10 @@ require('nvim-alternate').setup({
 
 ```lua
 require('nvim-alternate').setup({
-  pairs = {
-    { "lib/*.ex",        "test/*_test.exs" },
-    { "lib/*/live/*.ex", "lib/*/live/*.html.heex" },
-    { "apps/*/lib/*.ex", "apps/*/test/*_test.exs" },
+  rules = {
+    { glob = { "lib/*.ex", "test/*_test.exs" } },
+    { glob = { "lib/*/live/*.ex", "lib/*/live/*.html.heex" } },
+    { glob = { "apps/*/lib/*.ex", "apps/*/test/*_test.exs" } },
   }
 })
 ```
