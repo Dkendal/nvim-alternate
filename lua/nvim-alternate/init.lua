@@ -1,22 +1,42 @@
 local group = vim.api.nvim_create_augroup("nvim-alternate", { clear = true })
 
 ---Set the list of alternate files
----@param paths string
+---@param paths { [string] : number }
 ---@return nil
 local function set_alternates(paths)
-  vim.b.alternate = paths
+  vim.b.alternates = paths
 end
 
----@return string
+---@return {[string] : number}
 local function get_alternates()
-  return vim.b.alternate
+  return vim.b.alternates or {}
 end
 
-local function glob2re(glob)
+---@return string[]
+local function list_alternates()
+  local alts = get_alternates()
+  local list = {}
+
+  for path, rank in pairs(alts) do
+    table.insert(list, { rank = rank, path = path })
+  end
+
+  table.sort(list, function(a, b)
+    return a.rank < b.rank
+  end)
+
+  list = vim.tbl_map(function(v)
+    return v.path
+  end, list)
+
+  return list
+end
+
+local function glob2pattern(glob)
   local s = glob
   s = string.gsub(s, "*", "(.+)")
   s = string.gsub(s, "{(.-)}", function(str)
-    return "(" .. string.gsub(str, ",", "|") .. ")"
+    return "(" .. string.gsub(str, ",", "|") .. ")$"
   end)
   return s
 end
@@ -39,8 +59,7 @@ end
 
 ---@param opts {pattern: string[], callback: function, events: string[]}
 local function autocmd(opts)
-  local events = opts.events or { "BufEnter", "BufWinEnter" }
-
+  local events = opts.events
   vim.api.nvim_create_autocmd(events, {
     group = group,
     pattern = opts.pattern,
@@ -48,93 +67,90 @@ local function autocmd(opts)
   })
 end
 
----Map a file to an alternate file
----@param file string
----@param pattern string
----@param substitute string
----@param opts {glob: boolean} | nil
----@return string
-local function map_alternate(file, pattern, substitute, opts)
-  if opts and opts.glob then
-    pattern = glob2re(pattern)
-    substitute = glob2capture(substitute)
-  end
-
-  file = vim.fn.fnamemodify(file, ":~:.")
-
-  local out, _ = string.gsub(file, pattern, substitute)
-
-  return out
-end
-
-
----comment
----@param patternA string
----@param patternB string
----@return nil
-local function alternate_pair(patternA, patternB)
-  autocmd({
-    pattern = { patternA },
-    callback = function(args)
-      set_alternates(map_alternate(args.file, patternA, patternB, { glob = true }))
-    end,
-  })
-
-  autocmd({
-    pattern = { patternB },
-    callback = function(args)
-      set_alternates(map_alternate(args.file, patternB, patternA, { glob = true }))
-    end,
-  })
-end
-
 local plug = {}
 
 function plug.edit()
-  local path = get_alternates()
+  local alts = list_alternates()
 
-  if path == nil then
+  if #alts == 1 then
+    vim.cmd("edit " .. alts[1])
+  elseif #alts > 1 then
+    vim.ui.select(alts, {
+      format_item = function(path)
+        return vim.fn.fnamemodify(path, ":~:.")
+      end,
+    }, function(choice)
+      if type(choice) == "string" then
+        vim.cmd("edit " .. choice)
+      end
+    end)
+  elseif #alts == 0 then
     print("No alternates found")
     return
-  else
-    assert(type(path) == "string", "expected path to be a string")
-    vim.cmd("edit " .. path)
   end
 end
 
----@param opts { pairs: ([string, string] | [string[], string, string])[] } | nil
+---@param file string
+---@param pattern string
+---@param substitute string
+---@param rank integer
+---@return boolean
+local function try_match(file, pattern, substitute, rank)
+  if not string.match(file, pattern) then
+    return false
+  end
+
+  local alt_path, _ = string.gsub(file, pattern, substitute)
+  local alts = get_alternates()
+  alts[alt_path] = rank
+  set_alternates(alts)
+
+  return true
+end
+
+---@class alternate.GlobRule
+---@field glob { [1]: string, [2]: string }
+---
+---@class alternate.PatternRule
+---@field pattern { [1]: string, [2]: string }
+---
+---@alias alternate.Rule alternate.GlobRule | alternate.PatternRule
+---@param opts { rules: alternate.Rule[] } | nil
 local function setup(opts)
   opts = opts or {}
-  local opts_pairs = opts.pairs or {}
 
-  for _, patterns in ipairs(opts_pairs) do
-    if #patterns == 2 then
-      local a = patterns[1]
-      local b = patterns[2]
-      assert(type(a) == "string", "config.pairs[][1] must be a string")
-      assert(type(b) == "string", "config.pairs[][2] must be a string")
-      alternate_pair(a, b)
-    elseif #patterns == 3 then
-      local autocmd_pattern = patterns[1]
-      local file_pattern = patterns[2]
-      local file_substitute = patterns[3]
+  assert(type(opts.rules) == "table", "Expected opts.rules to be a table, actually: " .. type(opts.rules))
 
-      assert(type(autocmd_pattern) == "table", "config.pairs[][1] must be a string[]")
+  for idx, pattern in ipairs(opts.rules) do
+    assert(
+      type(pattern) == "table",
+      "Expected opts.rules[" .. idx .. "] to be a table, actually: " .. type(pattern)
+    )
 
-      for idx, pat in ipairs(autocmd_pattern) do
-        assert(type(pat) == "string", string.format("config.pairs[][1][%d] must be a string[]", idx))
-      end
+    assert(
+      (type(pattern.glob) == "table" and #pattern.glob == 2)
+      or (type(pattern.pattern) == "table" and #pattern.pattern == 2),
+      "Expected opts.rules[" .. idx .. "] to define `glob` or `pattern` as a two element tuple"
+    )
 
-      assert(type(file_pattern) == "string", "config.pairs[][2] must be a string")
-      assert(type(file_substitute) == "string", "config.pairs[][3] must be a string")
+    autocmd({
+      events = { "BufEnter" },
+      pattern = { "*" },
+      group = group,
+      callback = function(args)
+        if pattern.glob then
+          local pattern_a, pattern_b = unpack(vim.tbl_map(glob2pattern, pattern.glob))
+          local sub_b, sub_a = unpack(vim.tbl_map(glob2capture, pattern.glob))
 
-      autocmd({
-        pattern = autocmd_pattern,
-        callback = function(args)
-          set_alternates(map_alternate(args.file, file_pattern, file_substitute, { glob = false }))
-        end,
-      })
-    end
+          if not try_match(args.file, pattern_a, sub_a, idx) then
+            try_match(args.file, pattern_b, sub_b, idx)
+          end
+        elseif pattern.pattern then
+          local lua_pattern, substitute = unpack(pattern.pattern)
+          try_match(args.file, lua_pattern, substitute, idx)
+        end
+      end,
+    })
   end
 
   vim.keymap.set("n", "<plug>(alternate-edit)", plug.edit, {})
@@ -143,10 +159,7 @@ local function setup(opts)
     local alt = get_alternates()
 
     if type(alt) == "string" then
-      print("No alternates")
-      return
-    else
-      vim.print(vim.inspect(alt))
+      vim.notify("No alternates for file")
     end
   end, { force = true })
 end
@@ -154,5 +167,4 @@ end
 return {
   setup = setup,
   plug = plug,
-  map_alternate = map_alternate,
 }
