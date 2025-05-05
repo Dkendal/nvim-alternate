@@ -16,6 +16,7 @@ A Neovim plugin that provides alternate file mappings, similar to [vim-projectio
 ```lua
 {
   'dkendal/nvim-alternate',
+  lazy = false, -- Important
   config = function()
     require('nvim-alternate').setup({
       -- Configuration (see below)
