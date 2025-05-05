@@ -89,6 +89,7 @@ This example shows how to configure the plugin with lazy.nvim:
             { glob = { "test/*_test.rb", "app/*.rb" } },
             -- Lua
             { glob = { "lua/*.lua", "tests/*_spec.lua" } },
+            -- Typescript / Javascript
             { pattern = { "(.+).([jt]sx?)$", "%1.test.%2" } },
             { pattern = { "(.+).test.([jt]sx?)$", "%1.%2" } },
         },
